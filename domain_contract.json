@@ -1,26 +1,77 @@
 {
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "service_id": "archaeology-context",
   "service_name": "考古现场上下文档案",
-  "scope": "连接发掘区、地层、遗迹、器物、样品和研究观点，保存现场上下文。",
+  "scope": "以只追加事件日志连接发掘区、地层、遗迹单位、出土物、样品、检测结果与研究观点，保存不可断裂的现场上下文。",
+  "architecture": {
+    "storage": "append-only hash-chained event log (JSONL)",
+    "replay": "projections rebuild by occurred_at, ties broken by seq",
+    "immutability": "事实只追加、不更新、不删除；更正与处置以新事件表达",
+    "freezing": "发布快照在提交时固化进事件载荷，新证据不影响已发布报告"
+  },
   "actors": [
+    "公众",
     "发掘领队",
     "测绘员",
     "库房管理员",
     "检测机构",
-    "研究人员"
+    "研究人员",
+    "项目负责人"
   ],
+  "roles": {
+    "public": "公众，仅可访问 /public 接口",
+    "surveyor": "测绘员，登记发掘区、地层、遗迹、出土物并处置编号/位置复核",
+    "director": "发掘领队，立项、采样、复核仲裁",
+    "curator": "库房管理员，登记暂存、送检、修复、入库等交接",
+    "lab": "检测机构，登记接收与碳十四结果",
+    "researcher": "研究人员，类型学、铭文释读与互竞观点",
+    "pi": "项目负责人，采用观点、发布报告、决定公开披露"
+  },
   "states": [
     "现场登记",
     "待复核",
+    "已暂存",
+    "送检中",
+    "修复中",
     "已入库",
     "研究中",
     "已发布"
   ],
+  "event_types": [
+    "ProjectCreated",
+    "AreaOpened",
+    "StratumRecorded",
+    "FeatureRecorded",
+    "ArtifactRegistered",
+    "ArtifactCorrected",
+    "SampleTaken",
+    "CustodyTransferred",
+    "RadiocarbonResult",
+    "TypologyClassified",
+    "InscriptionInterpreted",
+    "ClaimProposed",
+    "ViewpointAdopted",
+    "ReportPublished",
+    "DiscoveryDisclosed",
+    "ReviewResolved"
+  ],
+  "review_kinds": [
+    "duplicate_code: 业务编号重号",
+    "duplicate_identity: 同一内部标识被重复登记",
+    "coordinate_conflict: 同区坐标重合",
+    "stratum_order_conflict: 地层层序撞号",
+    "broken_context: 空间上下文链断裂"
+  ],
   "invariants": [
-    "出土物不得脱离其地层与遗迹单位",
-    "编号或坐标冲突必须经过人工复核",
-    "公开数据隐藏未披露墓址的精确坐标"
+    "出土物不得脱离其地层与遗迹单位：器物→遗迹→地层→发掘区链条断裂即进入复核，更正不允许改挂遗迹",
+    "编号或坐标冲突必须经过人工复核：重复记录全部保留，任何原始记录不得被自动覆盖",
+    "离线补录按业务发生时间 occurred_at 合并到时间轴，recorded_at 记录实际接收时间",
+    "client_event_id 保证幂等：设备重试不会产生重复事实",
+    "送检、暂存、修复、入库的每次交接都保留责任人（actor 与 handler）",
+    "碳十四区间、器物类型与铭文释读可支持彼此竞争的年代或墓主观点，互斥观点并存不合并",
+    "正式发布只冻结所采用的证据版本：快照写入事件载荷并受哈希链保护，永不改写",
+    "新证据出现后当前关联结论重算并产生新证据版本，不影响旧报告快照",
+    "公开数据隐藏未披露发现（查询返回与不存在相同的 404）及未授权公开的精确坐标",
+    "项目负责人可由一件器物还原出土环境、交接责任链、检测结果、解释变化与全部历史报告"
   ]
 }
-
